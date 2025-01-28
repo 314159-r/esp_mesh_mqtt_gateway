@@ -1,0 +1,14 @@
+{
+  "serial_port": "/dev/serial/by-id/___your_esp-gateway_device_id___",
+  "serial_speed": 230400,
+  "mqtt_host": "___your_mqtt-host_address___",
+  "mqtt_port": 1883,
+  "mqtt_username": "___your_username___",
+  "mqtt_password": "___your_password___",
+  "mqtt_from_mesh_prefix": "espnow/",
+  "mqtt_to_mesh_prefix": "espnow/",
+  "node_name": "m",
+  "mesh_send_ttl": 5,
+  "pub_timeout": 50,
+  "pub_try_cnt": 5
+}

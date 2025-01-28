@@ -1,0 +1,35 @@
+# EspNow Flooding Mesh - configuration examples
+
+# serial port that esp gateway connected to
+serial_port: "/dev/serial/by-id/___your_esp-gateway_device_id___"
+             "/dev/ttyUSB0"   (! Not recommended)
+serial_speed: 230400
+
+# master / main node name (keep it short to reduce mqtt message size)
+node_name: "m"
+
+# mesh ttl, max number of node hopps to restransmit messages
+mesh_send_ttl: 5
+
+# publish timeout (milliseconds)
+pub_timeout: 50
+
+# publish restransmit try count 
+pub_try_cnt: 10
+
+# MQTT broker host address, port, username & password
+mqtt_host: "core-mosquitto"     (for Mosquito in Home Assistant)
+           "mqtt.local"
+mqtt_port: 1883
+
+mqtt_username: "___your_username___",
+mqtt_password: "___your_password___",
+
+# mqtt topic prefix for messages from EspNow devices (sensors data)
+mqtt_from_mesh_prefix: "espnow/"
+
+# mqtt topic prefix for message to EspNow devices (commands)
+mqtt_to_mesh_prefix: "espnow/"
+
+# exclude node names (do not process stats for them)
+nodes_exclude: ["xiaomi"]

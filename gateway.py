@@ -1,5 +1,5 @@
-# mesh mqtt gateway (main node)
-
+#  Gateway: Esp-Now Flooding Mesh <-> MQTT
+#  ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 #import serial
 from periphery import Serial
 import io
@@ -8,8 +8,24 @@ import random, string
 from datetime import datetime
 import paho.mqtt.client as mqtt
 import logging
+import os
+import json
+# import config
 
-import config
+
+if os.path.exists('/data/options.json'):
+    print('Running in hass.io add-on mode')
+    fp = open('/data/options.json', 'r')
+    config = json.load(fp)
+    fp.close()
+elif os.path.exists('gw-config.json'):
+    print('Running in local mode')
+    fp = open('gw-config.json', 'r')
+    config = json.load(fp)
+    fp.close()
+else:
+    print('Configuration file not found, exiting.')
+    sys.exit(1)
 
 # to allow send stored messages after node subscribes
 message_cache = {}
@@ -17,14 +33,13 @@ message_cache = {}
 #logging.getLogger().setLevel('INFO')
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
-
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
     logging.info('MQTT Connected with result code ' + str(rc))
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe(config.mqtt_to_mesh_prefix + '#')
+    client.subscribe(config['mqtt_to_mesh_prefix'] + '#')
 
 
 def convert2hex(message):
@@ -40,8 +55,8 @@ def mesh_publish_topic(topic, value):
     value = str(value).rstrip(" \r\n")
     # send message to the mesh #  REQC ttl timeout try_cnt [message]
     msgid = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-    message1 = f'MQTT {config.node_name}/{msgid}\nP:{topic} {value}\n\0'
-    message = 'REQC ' + str(config.mesh_send_ttl) + ' ' + str(config.pub_timeout) + ' ' + str(config.pub_try_cnt) 
+    message1 = f'MQTT {config["node_name"]}/{msgid}\nP:{topic} {value}\n\0'
+    message = 'REQC ' + str(config['mesh_send_ttl']) + ' ' + str(config['pub_timeout']) + ' ' + str(config['pub_try_cnt']) 
     message += ' [' + convert2hex(message1) + '];\n'
     logging.info('>>> MESH Publishing: ' + message)
     sio.write(message.encode())
@@ -51,10 +66,10 @@ def mesh_publish_topic(topic, value):
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
     logging.info('From MQTT broker: ' + msg.topic + ' ' + str(msg.payload))
-    topic = remove_prefix(msg.topic, config.mqtt_to_mesh_prefix)
+    topic = remove_prefix(msg.topic, config['mqtt_to_mesh_prefix'])
     value = msg.payload.decode('ascii', 'replace')
 
-    if topic.startswith(config.node_name + '/'):
+    if topic.startswith(config['node_name'] + '/'):
         # process internal commands
         topic_parts = topic.split('/')
         if topic_parts[1] == 'ota' and topic_parts[2] == 'set':
@@ -105,7 +120,7 @@ def send_rtc():
 
 
 def init_mesh():
-    send_expect(sio, f'ROLE MASTER {config.mesh_send_ttl};', f'ACK {config.mesh_send_ttl};')
+    send_expect(sio, f'ROLE MASTER {config["mesh_send_ttl"]};', f'ACK {config["mesh_send_ttl"]};')
     send_rtc()
     send_expect(sio, 'INIT;', 'ACKINIT;')
 
@@ -119,7 +134,7 @@ def translate_topic(src_node, from_mesh_topic):
 
 mesh_initialized = False
 
-with Serial(config.serial_port, config.serial_speed) as sio:
+with Serial(config['serial_port'], int(config['serial_speed'])) as sio:
     #sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser), errors='replace', encoding='ascii')
     rebooted = False
     while rebooted == False:
@@ -132,7 +147,8 @@ with Serial(config.serial_port, config.serial_speed) as sio:
     client = mqtt.Client()
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect(config.mqtt_host, config.mqtt_port, 60)
+    client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
+    client.connect(config['mqtt_host'], config['mqtt_port'], 60)
     # start mqtt async loop
     client.loop_start() # async loop
 
@@ -150,8 +166,8 @@ with Serial(config.serial_port, config.serial_speed) as sio:
                     prefix, src_node, msgid, cmd, topic = s.split(' ', 4)
                 mqtt_topic = translate_topic(src_node, topic)
                 if cmd == 'P':
-                    logging.info('Publishing to broker: %s %s', config.mqtt_from_mesh_prefix + mqtt_topic, value)
-                    client.publish(config.mqtt_from_mesh_prefix + mqtt_topic, value)
+                    logging.info('Publishing to broker: %s %s', config['mqtt_from_mesh_prefix'] + mqtt_topic, value)
+                    client.publish(config['mqtt_from_mesh_prefix'] + mqtt_topic, value)
                 if cmd == 'S':
                     logging.info('Subscribe, send last message to mesh: ' + value)
                     if mqtt_topic in message_cache:
@@ -183,8 +199,8 @@ with Serial(config.serial_port, config.serial_speed) as sio:
 
             if s.startswith('STATS') or s.startswith('MAC_ADDR'):
                 prefix, p1 = s.split(' ')
-                topic = config.node_name + '/bin/' + prefix.lower() + '/value'
-                client.publish(config.mqtt_from_mesh_prefix + topic, p1.rstrip(';'))
+                topic = config['node_name'] + '/bin/' + prefix.lower() + '/value'
+                client.publish(config['mqtt_from_mesh_prefix'] + topic, p1.rstrip(';'))
 
             if s.startswith('STATS_OLD'):
                 prefix, p1, p2 = s.split(' ', 3)
@@ -193,8 +209,8 @@ with Serial(config.serial_port, config.serial_speed) as sio:
                 bin_len = len(arr)
                 # post it as a blob under nodename/stats
                 bin_blob = bytes([int(x,base=16) for x in arr])
-                topic = config.node_name + '/stats'
-                client.publish(config.mqtt_from_mesh_prefix + topic, bin_blob)
+                topic = config['node_name'] + '/stats'
+                client.publish(config['mqtt_from_mesh_prefix'] + topic, bin_blob)
 
         # time sync
         if int(time.time() * 1000) > ts_ms + 300000:

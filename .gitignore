@@ -3,5 +3,5 @@ venv/
 old/
 stats/
 
-config.py
+gw-config.json
 mac_names.csv
