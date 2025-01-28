@@ -1,5 +1,7 @@
 # EspNow2mqtt
-![](logo.png) ![](images/home-assistant-logo.png)
+
+&emsp; <img src="https://github.com/314159-r/esp_mesh_mqtt_gateway/blob/master/logo.png" height="60" style="margin:0px 20px"> &emsp; <img src="https://github.com/314159-r/esp_mesh_mqtt_gateway/blob/master/images/home-assistant-logo.png" height="60" style="margin:0px 20px">
+
 #### - Home Assistant Add-on
 #### - MQTT gateway for EspNow Flooding Mesh wireless devices (esp8266 or esp32)
 ----
